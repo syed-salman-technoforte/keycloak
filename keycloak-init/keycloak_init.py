@@ -56,6 +56,90 @@ class KeycloakSession:
         except:
             raise
 
+    def create_flow_to_auth_flow(self, realm, flow_alias, add_flow_payload):
+        self.keycloak_admin.realm_name = realm
+        payload = add_flow_payload
+
+        URL = 'admin/realms/{realm-name}/authentication/flows/{flow_alias}/executions/flow'
+        params_path = {"realm-name": self.keycloak_admin.realm_name, "flow_alias": flow_alias}
+        try:
+            response = self.keycloak_admin.connection.raw_post(
+                URL.format(**params_path),
+                data=json.dumps(payload)
+            )
+            raise_error_from_response(response, KeycloakGetError)
+
+        except KeycloakError as e:
+            if e.response_code == 409:
+                print('\t\t\t\tFlow "%s" already exists; SKIPPING;' % flow_alias)
+            else:
+                raise
+
+    def create_execution_to_auth_flow(self, realm, flow_alias, add_execution_payload):
+        self.keycloak_admin.realm_name = realm
+        payload = add_execution_payload
+
+        try:
+
+            GET_URL = 'admin/realms/{realm-name}/authentication/flows/{flow_alias}/executions'
+            params_path = {"realm-name": self.keycloak_admin.realm_name, "flow_alias": flow_alias}
+            GET_RESPONSE = self.keycloak_admin.connection.raw_get(
+                GET_URL.format(**params_path)
+            )
+            AUTH_EXECUTION_LIST=GET_RESPONSE.json()
+            for auth_execution in AUTH_EXECUTION_LIST:
+                if auth_execution['displayName'] == payload['displayName']:
+                    print('\t\t\t\tExecution for flow "%s" already exists; SKIPPING;' % add_execution_payload['displayName'])
+                    raise_error_from_response(GET_RESPONSE, KeycloakError,None, True)
+                    return
+
+            URL = 'admin/realms/{realm-name}/authentication/flows/{flow_alias}/executions/execution'
+            params_path = {"realm-name": self.keycloak_admin.realm_name, "flow_alias": flow_alias}
+
+            response = self.keycloak_admin.connection.raw_post(
+                URL.format(**params_path),
+                data=json.dumps(payload)
+            )
+            raise_error_from_response(response, KeycloakGetError)
+
+        except KeycloakError as e:
+            if e.response_code == 409:
+                print('\t\t\t\tExecution for flow "%s" already exists; SKIPPING;' % add_execution_payload['displayName'])
+            else:
+                raise
+
+
+    def create_authentication_flow(self, realm, auth_flow_payload):
+        self.keycloak_admin.realm_name = realm
+        executions=[]
+        if 'authentication_executions' in auth_flow_payload:
+           executions = auth_flow_payload.pop('authentication_executions')
+
+        flows=[]
+        if 'authentication_flows' in auth_flow_payload:
+            flows = auth_flow_payload.pop('authentication_flows')
+
+        payload = auth_flow_payload
+        URL = 'admin/realms/{realm-name}/authentication/flows'
+        params_path = {"realm-name": self.keycloak_admin.realm_name}
+        try:
+            response = self.keycloak_admin.connection.raw_post(URL.format(**params_path), data=json.dumps(payload))
+            raise_error_from_response(response, KeycloakError)
+        except KeycloakError as e:
+            if e.response_code == 409:
+                print('\t\t\tFlow "%s" already exists; SKIPPING;' % payload['alias'])
+            else:
+                raise
+
+        for execution in executions:
+            print('\t\t\tAdding execution : "%s" for "%s" ' % (execution['displayName'], payload['alias']))
+            self.create_execution_to_auth_flow(realm, payload['alias'], execution)
+
+        for flow in flows:
+            print('\t\t\tAdding flow : "%s" for "%s" ' % (flow['alias'], payload['alias']))
+            self.create_flow_to_auth_flow(realm, payload['alias'], flow)
+
+
     def delete_realm(self, realm, skip_exists=False):
         self.keycloak_admin.realm_name = realm  # work around because otherwise client was getting created in master
         url = 'admin/realms/'+realm
@@ -420,7 +504,7 @@ def main():
     fp = open(input_yaml, 'rt')
     values = yaml.load(fp, Loader=yaml.FullLoader)
 
-    server_url = server_url + '/auth/' # Full url to access api
+    server_url = server_url # Full url to access api
 
     try:
         print(server_url)
@@ -466,6 +550,17 @@ def main():
                 client_scopes = values[realm]['client_scopes']
             for client_scope in client_scopes:
                 ks.create_client_scope(realm, client_scope)
+
+            authentication = []
+            if 'authentication' in values[realm]:
+                authentication = values[realm]['authentication']
+                auth_flows = []
+                if 'auth_flows' in authentication:
+                    auth_flows = authentication['auth_flows']
+                    print('\tCreating authentication flows')
+                    for auth_flow in auth_flows:
+                        print('\t\tCreating authentication flow for "%s" ' % auth_flow['alias'])
+                        ks.create_authentication_flow(realm, auth_flow)
 
             # Expect secrets passed via env variables.
             clients = []
