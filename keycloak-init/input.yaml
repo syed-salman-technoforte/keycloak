@@ -46,7 +46,7 @@ mosip:
               - provider: "recaptcha-u-p-form"
                 displayName: "Recaptcha Username Password Form"
                 update_config:
-                  alias: "ctk_captcha"
+                  alias: "ctk-captcha"
                   config:
                     secret: ""
                     site.key: ""
