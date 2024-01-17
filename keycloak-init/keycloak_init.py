@@ -92,7 +92,7 @@ class KeycloakSession:
                 print(space,'\033[91m'+"Environmental variable ",payload['alias']+"-secret-key"," Not Found; EXITING")
                 exit(1)
             if use_recaptcha_net is None:
-                print(space,'\033[91m'+"Environmental variable ",payload['alias']+"-use-recaptcha-net"," Not Found; Setting empty value :")
+                print(space,"Environmental variable ",payload['alias']+"-use-recaptcha-net"," Not Found; Setting empty value :")
                 use_recaptcha_net=''
             payload['config']['secret']=secret_key
             payload['config']['site.key']=site_key
