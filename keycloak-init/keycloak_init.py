@@ -84,6 +84,7 @@ class KeycloakSession:
             site_key=os.environ.get(payload['alias']+"-site-key")
             secret_key=os.environ.get(payload['alias']+"-secret-key")
             use_recaptcha_net=os.environ.get(payload['alias']+"-use-recaptcha-net")
+            print(os.environ)
             if site_key is None:
                 print(space,'\033[91m'+"Environmental variable ",payload['alias']+"-site-key"," Not Found; EXITING")
                 exit(1)
