@@ -1,4 +1,19 @@
 mosip:
+  roles:
+    - CTK_ADMIN
+  clients:
+    - name: mosip-toolkit-client
+      saroles: []
+      authentication_flow_overrides:
+        browser: 'Browser With Recaptcha'
+    - name: mosip-toolkit-android-client
+      public_client: True
+      redirect_urls: ["android://mosip-compliance-toolkit-ui","http://localhost"]
+      web_origins: ["android://mosip-compliance-toolkit-ui","http://localhost"]
+      direct_grant_flow_alias: 'direct grant'
+      browser_flow_alias: 'Browser With Recaptcha'
+      authentication_flow_overrides:
+        browser: 'Browser With Recaptcha'
   authentication:
     auth_flows:
       - alias: "Browser With Recaptcha"
@@ -8,17 +23,48 @@ mosip:
         topLevel: true
         authentication_executions:
           - provider: "auth-cookie"
-            requirement: "ALTERNATIVE"
             displayName: "Cookie"
+            update_execution:
+              requirement: "ALTERNATIVE"
           - provider: "auth-spnego"
-            requirement: "DISABLED"
             displayName: "Kerberos"
+            update_execution:
+              requirement: "DISABLED"
           - provider: "identity-provider-redirector"
-            requirement: "ALTERNATIVE"
             displayName: "Identity Provider Redirector"
+            update_execution:
+              requirement: "ALTERNATIVE"
         authentication_flows:
           - alias: "browser with recaptcha forms"
             description: ""
             provider: "registration-page-form"
             type: "basic-flow"
-
+            displayName: "browser with recaptcha forms"
+            update_flow_requirement:
+              requirement: "ALTERNATIVE"
+            authentication_executions:
+              - provider: "recaptcha-u-p-form"
+                displayName: "Recaptcha Username Password Form"
+                update_config:
+                  alias: "ctk_captcha"
+                  config:
+                    secret: ""
+                    site.key: ""
+                    useRecaptchaNet: ""
+            authentication_flows:
+              - alias: "Browser With Recaptcha Browser - Conditional OTP"
+                description: ""
+                provider: "registration-page-form"
+                type: "basic-flow"
+                displayName: 'Browser With Recaptcha Browser - Conditional OTP'
+                update_execution:
+                  requirement: "CONDITIONAL"
+                authentication_executions:
+                  - provider: "conditional-user-configured"
+                    displayName: "Condition - user configured"
+                    update_execution:
+                      requirement: "REQUIRED"
+                  - provider: "auth-otp-form"
+                    displayName: "OTP Form"
+                    update_execution:
+                      requirement: "REQUIRED"
