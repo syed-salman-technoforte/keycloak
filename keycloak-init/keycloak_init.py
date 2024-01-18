@@ -624,7 +624,8 @@ def main():
             if realm == "del_realms":
                 continue
             print('\tCreate realms : %s' %realm)
-            ks.create_realm(realm, values[realm]['realm_config'])  # {realm : [role]}
+            if 'realm_config' in values[realm]:
+                ks.create_realm(realm, values[realm]['realm_config'])  # {realm : [role]}
 
         for realm in values:
             roles = []
