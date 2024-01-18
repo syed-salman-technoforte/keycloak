@@ -3,7 +3,6 @@
 
 import os
 import sys
-import ast
 import argparse
 import secrets
 import json
@@ -11,7 +10,6 @@ import yaml
 import traceback
 from keycloak import KeycloakAdmin
 from keycloak.exceptions import raise_error_from_response, KeycloakError, KeycloakGetError
-from keycloak.connection import  ConnectionManager
 from keycloak.urls_patterns import URL_ADMIN_USER_REALM_ROLES
 
 class KeycloakSession:
@@ -21,34 +19,8 @@ class KeycloakSession:
                                             password=pwd,
                                             realm_name=realm,
                                             verify=ssl_verify)
-    def create_realm(self, realm, frontend_url=''):
-        payload = {
-            "realm" : realm,
-            "enabled": True,
-            "accessCodeLifespan": 7200,
-            "accessCodeLifespanLogin": 1800,
-            "accessCodeLifespanUserAction": 300,
-            "accessTokenLifespan": 86400,
-            "accessTokenLifespanForImplicitFlow": 900,
-            "actionTokenGeneratedByAdminLifespan": 43200,
-            "actionTokenGeneratedByUserLifespan": 300,
-            "passwordPolicy":"length(8)",
-            "resetPasswordAllowed": True,
-            "bruteForceProtected":True,
-            "permanentLockout":False,
-            "maxFailureWaitSeconds":900,
-            "minimumQuickLoginWaitSeconds":60,
-            "waitIncrementSeconds":300,
-            "quickLoginCheckMilliSeconds":1000,
-            "maxDeltaTimeSeconds":600,
-            "failureFactor":5,
-            "attributes": {"frontendUrl": frontend_url},
-            "loginTheme":"mosip",
-            "accountTheme":"mosip",
-            "adminTheme":"mosip",
-            "emailTheme":"mosip",
-            "browserSecurityHeaders": { "contentSecurityPolicy": "frame-src 'self' https://www.google.com; frame-ancestors 'self'; object-src 'none';" }
-        }
+    def create_realm(self, realm, realm_config):
+        payload = realm_config
         try:
             self.keycloak_admin.create_realm(payload, skip_exists=False)
         except KeycloakError as e:
@@ -81,17 +53,16 @@ class KeycloakSession:
         self.keycloak_admin.realm_name = realm
         payload = update_config_payload
         try:
-            site_key=os.environ.get(payload['alias']+"-site-key")
-            secret_key=os.environ.get(payload['alias']+"-secret-key")
-            use_recaptcha_net=os.environ.get(payload['alias']+"-use-recaptcha-net")
-            print(os.environ)
-            if site_key is None:
+            site_key=os.environ.get(payload['alias']+"-site-key") if os.environ.get(payload['alias']+"-site-key") else payload['config']['secret']
+            secret_key=os.environ.get(payload['alias']+"-secret-key") if os.environ.get(payload['alias']+"-secret-key") else payload['config']['site.key']
+            use_recaptcha_net=os.environ.get(payload['alias']+"-use-recaptcha-net") if os.environ.get(payload['alias']+"-use-recaptcha-net") else payload['config']['useRecaptchaNet']
+            if site_key is None or site_key == '':
                 print(space,'\033[91m'+"Environmental variable ",payload['alias']+"-site-key"," Not Found; EXITING")
                 exit(1)
-            if secret_key is None:
+            if secret_key is None or secret_key == '':
                 print(space,'\033[91m'+"Environmental variable ",payload['alias']+"-secret-key"," Not Found; EXITING")
                 exit(1)
-            if use_recaptcha_net is None:
+            if use_recaptcha_net is None or use_recaptcha_net == '':
                 print(space,"Environmental variable ",payload['alias']+"-use-recaptcha-net"," Not Found; Setting empty value :")
                 use_recaptcha_net=''
             payload['config']['secret']=secret_key
@@ -617,7 +588,6 @@ def args_parse():
     parser.add_argument('password', type=str, help='Admin password')
     parser.add_argument('input_yaml', type=str, help='File containing input for roles and clients in YAML format')
     parser.add_argument('--disable_ssl_verify', help='Disable ssl cert verification while connecting to server', action='store_true')
-    parser.add_argument('--frontend_url', help='Frontend URL', dest='frontend_url', action='store', default='')
 
     args = parser.parse_args()
     return args
@@ -653,8 +623,8 @@ def main():
         for realm in values:
             if realm == "del_realms":
                 continue
-            print('\tCreate realms : %s' % realm)
-            ks.create_realm(realm, args.frontend_url)  # {realm : [role]}
+            print('\tCreate realms : %s' %realm)
+            ks.create_realm(realm, values[realm]['realm_config'])  # {realm : [role]}
 
         for realm in values:
             roles = []
